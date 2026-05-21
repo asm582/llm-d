@@ -332,6 +332,85 @@ helm upgrade -i prometheus-adapter prometheus-community/prometheus-adapter \
 **Verify installation**: `kubectl get pods -n ${MON_NS} -l app.kubernetes.io/name=prometheus-adapter`
 
 
+## Benchmark Results
+
+Benchmarks were run on an NVIDIA H100 cluster (OpenShift) with a Poisson arrival profile. All values are **3-run averages**.
+
+### WVA & HPA Configuration Used
+
+**WVA v1 Saturation — Default (applied to all scenarios below)**
+
+| Parameter | Value |
+|---|---|
+| KV cache threshold | 0.80 |
+| Queue length threshold | 5 |
+| KV spare trigger | 0.10 |
+| Queue spare trigger | 3 |
+| Enable limiter | false |
+| Cost factor | 10.0 |
+
+**HPA**
+
+| Parameter | Value |
+|---|---|
+| Min / Max replicas | 1 / 10 |
+| Scale-up stabilization | 0 s |
+| Scale-up policy | 10 Pods / 150 s |
+| Scale-down stabilization | 240 s |
+| Scale-down policy | 10 Pods / 150 s |
+| Metric source | External (`wva_desired_replicas`) |
+
+### Results
+
+#### Prefill Heavy
+> 4,000 input tokens · 1,000 output tokens · 20 RPS
+
+| Model | Duration | Load Gen | P99 TTFT (ms) | P99 ITL (ms/tok) | Avg Replicas | Max Replicas | Avg KV Cache | Avg Queue Depth | Errors | Pod Startup (s) |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Qwen3-32B | 600 s | GuideLLM | 98,420 | 54.8 | 1.73 | 3 | 66.3% | 236.5 | 4,184 | 110 |
+| Qwen3-0.6B | 600 s | GuideLLM | 81,391 | 51.9 | 1.93 | 3 | 65.1% | 76.5 | 401 | 65 |
+| Qwen3-0.6B | 1800 s | GuideLLM | 66,177 | 47.3 | 3.17 | 5 | 55.7% | 41.2 | 860 | 66 |
+
+#### Decode Heavy
+> 1,000 input tokens · 4,000 output tokens · 20 RPS
+
+| Model | Duration | Load Gen | P99 TTFT (ms) | P99 ITL (ms/tok) | Avg Replicas | Max Replicas | Avg KV Cache | Avg Queue Depth | Errors | Pod Startup (s) |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Qwen3-32B | 600 s | GuideLLM | 78,051 | 47.1 | 1.84 | 3 | 79.2% | 108.8 | 3,563 | 109 |
+| Qwen3-0.6B | 600 s | GuideLLM | 62,296 | 41.1 | 1.89 | 3 | 61.7% | 51.1 | 1,408 | 65 |
+| Qwen3-0.6B | 1800 s | GuideLLM | 58,934 | 44.8 | 2.59 | 4 | 57.2% | 30.8 | 2,520 | 66 |
+
+#### Bursty
+> ~1,000 input tokens · ~1,000 output tokens · Multi-stage RPS (15 → 2 → 10 → 15 → 5 → 2)
+
+| Model | Duration | Load Gen | P99 TTFT (ms) | P99 ITL (ms/tok) | Avg Replicas | Max Replicas | Avg KV Cache | Avg Queue Depth | Errors | Pod Startup (s) |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Qwen3-32B | 900 s | GuideLLM | 262,441 | 196.3 | 2.43 | 4 | 45.1% | 53.5 | 6,110 | 103 |
+| Qwen3-0.6B | 900 s | inference-perf | 13,376 | 48.0 | 1.99 | 3 | 35.2% | 16.0 | 51 | 66 |
+| Qwen3-0.6B | 1800 s | inference-perf | 23,278 | 50.1 | 1.63 | 3 | 29.5% | 1.1 | 71 | 64 |
+
+#### Symmetrical
+> 1,000 input tokens · 1,000 output tokens · 20 RPS
+
+| Model | Duration | Load Gen | P99 TTFT (ms) | P99 ITL (ms/tok) | Avg Replicas | Max Replicas | Avg KV Cache | Avg Queue Depth | Errors | Pod Startup (s) |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Qwen3-32B | 600 s | GuideLLM | 100,187 | 67.3 | 1.70 | 3 | 70.2% | 166.8 | 3,729 | 103 |
+| Qwen3-0.6B | 600 s | GuideLLM | 23,169 | 43.3 | 1.80 | 3 | 52.0% | 13.0 | 17 | 64 |
+| Qwen3-0.6B | 1800 s | GuideLLM | 20,825 | 40.4 | 1.80 | 3 | 46.8% | 10.8 | 342 | 66 |
+
+### Metric Definitions
+
+| Metric | Definition |
+|---|---|
+| P99 TTFT | 99th-percentile time-to-first-token (ms) — lower is better |
+| P99 ITL | 99th-percentile inter-token latency (ms/token) — lower is better |
+| Avg Replicas | Mean pod count during the test window |
+| Avg KV Cache | Mean GPU KV cache utilization |
+| Avg Queue Depth | Mean pending-request queue depth at the endpoint proxy (EPP) |
+| Pod Startup | Average time for a new replica to become ready (s) |
+
+> Full per-run data and additional WVA tuning variants are in the [upstream benchmark doc](https://github.com/llm-d/llm-d-workload-variant-autoscaler/blob/main/docs/benchmark.md).
+
 ## FAQ
 
 **Q: How do I know which external metrics provider (Prometheus Adapter vs KEDA) is used?**
