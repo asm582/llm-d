@@ -334,31 +334,25 @@ helm upgrade -i prometheus-adapter prometheus-community/prometheus-adapter \
 
 ## Benchmark Results
 
-Benchmarks were run on an NVIDIA H100 cluster (OpenShift) with a Poisson arrival profile. All values are **3-run averages**.
+These benchmarks measure **single-variant autoscaling** — one model variant scaled dynamically by WVA based on saturation. Benchmarks were run on an NVIDIA H100 cluster (OpenShift) with a Poisson arrival profile. All values are **3-run averages**.
 
-### WVA & HPA Configuration Used
+### Configuration
 
-**WVA v1 Saturation — Default (applied to all scenarios below)**
+WVA v1 Saturation (Default) drives scaling decisions; HPA acts on the `wva_desired_replicas` metric WVA produces.
 
-| Parameter | Value |
-|---|---|
-| KV cache threshold | 0.80 |
-| Queue length threshold | 5 |
-| KV spare trigger | 0.10 |
-| Queue spare trigger | 3 |
-| Enable limiter | false |
-| Cost factor | 10.0 |
-
-**HPA**
-
-| Parameter | Value |
-|---|---|
-| Min / Max replicas | 1 / 10 |
-| Scale-up stabilization | 0 s |
-| Scale-up policy | 10 Pods / 150 s |
-| Scale-down stabilization | 240 s |
-| Scale-down policy | 10 Pods / 150 s |
-| Metric source | External (`wva_desired_replicas`) |
+| Component | Parameter | Value |
+|---|---|---|
+| WVA | KV cache threshold | 0.80 |
+| WVA | Queue length threshold | 5 |
+| WVA | KV spare trigger | 0.10 |
+| WVA | Queue spare trigger | 3 |
+| WVA | Enable limiter | false |
+| HPA | Min / Max replicas | 1 / 10 |
+| HPA | Scale-up stabilization | 0 s |
+| HPA | Scale-up policy | 10 Pods / 150 s |
+| HPA | Scale-down stabilization | 240 s |
+| HPA | Scale-down policy | 10 Pods / 150 s |
+| HPA | Metric source | External (`wva_desired_replicas`) |
 
 ### Results
 
