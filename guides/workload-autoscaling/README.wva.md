@@ -64,6 +64,7 @@ cat guides/workload-autoscaling/wva-config/platform/ocp/configmap-patch.yaml
 ```
 
 OpenShift defaults are already set in the overlay:
+
 - `PROMETHEUS_BASE_URL=https://thanos-querier.openshift-monitoring.svc.cluster.local:9091`
 - `PROMETHEUS_TLS_INSECURE_SKIP_VERIFY=true`
 

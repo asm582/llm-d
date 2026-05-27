@@ -44,50 +44,39 @@ Two scorers make up the routing decision alongside the load-aware stack:
 > The `gpu/vllm/` overlay defaults to 8 replicas to match the canonical 16×H100 benchmark. For smaller fleets (or quick smoke tests), reduce `replicas` in the deployment patch (`modelserver/gpu/vllm/patch-vllm.yaml`) before applying.
 
 > [!NOTE]
-> The router runs in **active-active HA** by default — two replicas behind one Service, each subscribing to every vLLM pod via pod-discovery so both indexes converge. Scale to a single replica with `--set inferenceExtension.replicas=1` if HA isn't needed (small fleets, smoke tests).
+> The router runs in **active-active HA** by default — two replicas behind one Service, each subscribing to every vLLM pod via pod-discovery so both indexes converge. Scale to a single replica with `--set router.epp.replicas=1` if HA isn't needed (small fleets, smoke tests).
 
 ## Prerequisites
 
 - Have the [proper client tools installed on your local system](../../helpers/client-setup/README.md) to use this guide.
 - Checkout llm-d repo:
 
-  ```bash
-    export branch="main" # branch, tag, or commit hash
-    git clone https://github.com/llm-d/llm-d.git && cd llm-d && git checkout ${branch}
-  ```
+```bash
+  export branch="main" # branch, tag, or commit hash
+  git clone https://github.com/llm-d/llm-d.git && cd llm-d && git checkout ${branch}
+```
 
 - Set the following environment variables:
-  ```bash
-    export GAIE_VERSION=v1.5.0
-    export GUIDE_NAME="precise-prefix-cache-routing"
-    export NAMESPACE=llm-d-precise
-  ```
-- Install the Gateway API Inference Extension CRDs:
 
-  ```bash
-    kubectl apply -k "https://github.com/kubernetes-sigs/gateway-api-inference-extension/config/crd?ref=${GAIE_VERSION}"
-  ```
-
-- Create a target namespace for the installation
-  ```bash
-    kubectl create namespace ${NAMESPACE}
-  ```
-
-- Set the following environment variables:
 ```bash
 export GAIE_VERSION=v1.5.0
+export ROUTER_CHART_VERSION=v0
 export GUIDE_NAME="precise-prefix-cache-routing"
 export NAMESPACE="llm-d-${GUIDE_NAME}"
 ```
 - Install the Gateway API Inference Extension CRDs:
+
 ```bash
 kubectl apply -k "https://github.com/kubernetes-sigs/gateway-api-inference-extension/config/crd?ref=${GAIE_VERSION}"
 ```
+
 - Create a target namespace for the installation
+
 ```bash
 kubectl create namespace ${NAMESPACE}
 ```
 
+  
 ## Installation Instructions
 
 ### 1. Prepare HF Token
@@ -105,35 +94,16 @@ kubectl -n ${NAMESPACE} create secret generic llm-d-hf-token --from-literal=HF_T
 This deploys the llm-d Router in the simple [Standalone Mode](placeholder-link):
 
 ```bash
+export REPO_ROOT=$(realpath $(git rev-parse --show-toplevel))
 helm install ${GUIDE_NAME} \
-  oci://registry.k8s.io/gateway-api-inference-extension/charts/standalone \
+  oci://ghcr.io/llm-d/charts/llm-d-router-standalone-dev \
   -f ${REPO_ROOT}/guides/recipes/router/base.values.yaml \
   -f ${REPO_ROOT}/guides/${GUIDE_NAME}/router/${GUIDE_NAME}.values.yaml \
-  --post-renderer ${REPO_ROOT}/guides/${GUIDE_NAME}/router/patches/uds-tokenizer/post-renderer.sh \
-  -n ${NAMESPACE} --version ${GAIE_VERSION}
+  -n ${NAMESPACE} --version ${ROUTER_CHART_VERSION}
 ```
 
-<details>
-<summary><b>Helm v4</b></summary>
-
-Helm v4's `--post-renderer` only accepts a registered plugin name, not a path. Install once, then swap the flag value:
-
-```bash
-helm plugin install guides/${GUIDE_NAME}/router/patches/uds-tokenizer
-# in the helm install above, replace the --post-renderer line with:
-#   --post-renderer uds-tokenizer
-```
-
-</details>
 
 The release name `${GUIDE_NAME}` is mandatory for standard deployments — the inference pool selector matches a guide label that pairs with this release.
-
-<details>
-<summary><b>Why a helm post-renderer is required (chart limitation)</b></summary>
-
-The standalone chart's `sidecar.*` slot is occupied by its Envoy proxy — overriding it would lose HTTP serving — so the UDS tokenizer container is appended via a helm post-render hook instead. The post-renderer runs `kustomize build` on the chart's rendered manifests with a strategic merge patch that adds the `tokenizer-uds` container (image `ghcr.io/llm-d/llm-d-uds-tokenizer:vllm-v0.19.1`), two `emptyDir` volumes (`tokenizers`, `tokenizer-uds`), and a `/tmp/tokenizer` volumeMount on the existing `epp` container so the `tokenizer` plugin can reach the UDS socket. Tracking removal of this workaround upstream — once the chart supports multiple sidecars natively, the post-renderer goes away.
-
-</details>
 
 <details>
 <summary><h4>Gateway Mode</h4></summary>
@@ -142,19 +112,18 @@ To use a Kubernetes Gateway managed proxy instead of the standalone Envoy sideca
 
 1. **Deploy a Kubernetes Gateway**. See [the gateway guides](../prereq/gateways) for step-by-step deployment of a Gateway named `llm-d-inference-gateway`.
 
-2. **Deploy the llm-d Router and HTTPRoute** via the `inferencepool` chart with `experimentalHttpRoute.enabled=true`. Same UDS post-renderer applies:
+2. **Deploy the llm-d Router and HTTPRoute** via the `llm-d-router-gateway` chart with `httpRoute.create=true`. Same UDS post-renderer applies:
 
 ```bash
 export REPO_ROOT=$(realpath $(git rev-parse --show-toplevel))
 export PROVIDER_NAME=istio   # options: none, gke, agentgateway, istio
 helm install precise-prefix-cache-routing \
-  oci://registry.k8s.io/gateway-api-inference-extension/charts/inferencepool \
+  oci://ghcr.io/llm-d/charts/llm-d-router-gateway-dev \
   -f ${REPO_ROOT}/guides/recipes/router/base.values.yaml \
   -f ${REPO_ROOT}/guides/recipes/router/features/httproute-flags.yaml \
   -f ${REPO_ROOT}/guides/${GUIDE_NAME}/router/${GUIDE_NAME}.values.yaml \
   --set provider.name=${PROVIDER_NAME} \
-  --post-renderer ${REPO_ROOT}/guides/${GUIDE_NAME}/router/patches/uds-tokenizer/post-renderer.sh 
-  -n ${NAMESPACE} --version ${GAIE_VERSION}
+  -n ${NAMESPACE} --version ${ROUTER_CHART_VERSION}
 ```
 
 </details>
@@ -179,6 +148,7 @@ kubectl apply -n ${NAMESPACE} -k ${REPO_ROOT}/guides/${GUIDE_NAME}/modelserver/g
   ```bash
   kubectl apply -n ${NAMESPACE} -k ${REPO_ROOT}/guides/recipes/modelserver/components/monitoring
   ```
+
 - Enable Prometheus scrape for the router by layering `-f ${REPO_ROOT}/guides/recipes/router/features/monitoring.values.yaml` onto the helm command in step 2.
 
 ## Verification

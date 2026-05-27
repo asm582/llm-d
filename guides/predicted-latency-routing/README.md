@@ -2,7 +2,6 @@
 
 [![Nightly - optimized baseline E2E (CKS)](https://github.com/llm-d/llm-d/actions/workflows/nightly-e2e-predicted-latency-cks.yaml/badge.svg)](https://github.com/llm-d/llm-d/actions/workflows/nightly-e2e-predicted-latency-cks.yaml) [![Nightly - optimized baseline E2E (GKE)](https://github.com/llm-d/llm-d/actions/workflows/nightly-e2e-predicted-latency-gke.yaml/badge.svg)](https://github.com/llm-d/llm-d/actions/workflows/nightly-e2e-predicted-latency-gke.yaml)
 
-
 ## Overview
 
 Route each inference request to the model server predicted to serve it fastest — and, optionally, only to a server predicted to meet its TTFT/TPOT SLO.
@@ -31,19 +30,23 @@ Skip it when your pool is **heterogeneous** — mixed GPU types, model variants,
     export branch="main" # branch, tag, or commit hash
     git clone https://github.com/llm-d/llm-d.git && cd llm-d && git checkout ${branch}
   ```
+
 - Set the following environment variables:
 
   ```bash
     export GAIE_VERSION=v1.5.0
+    export ROUTER_CHART_VERSION=v0
     export GUIDE_NAME="predicted-latency-routing"
     export NAMESPACE=llm-d-predicted-latency
     export MODEL_NAME="Qwen/Qwen3-32B"
   ```
+
 - Install the Gateway API Inference Extension CRDs:
 
   ```bash
     kubectl apply -k "https://github.com/kubernetes-sigs/gateway-api-inference-extension/config/crd?ref=${GAIE_VERSION}"
   ```
+
 - Create a target namespace for the installation:
 
   ```bash
@@ -70,13 +73,13 @@ This deploys the llm-d Router with an Envoy sidecar, it doesn't set up a Kuberne
 ```bash
 export REPO_ROOT=$(realpath $(git rev-parse --show-toplevel))
 helm install ${GUIDE_NAME} \
-    oci://registry.k8s.io/gateway-api-inference-extension/charts/standalone \
+    oci://ghcr.io/llm-d/charts/llm-d-router-standalone-dev \
     -f guides/recipes/router/base.values.yaml \
     -f ${REPO_ROOT}/guides/${GUIDE_NAME}/router/predicted-latency.values.yaml \
-    -n ${NAMESPACE} --version ${GAIE_VERSION}
+    -n ${NAMESPACE} --version ${ROUTER_CHART_VERSION}
 ```
 
-Nightly CI also sets `--set inferenceExtension.monitoring.prometheus.auth.enabled=false` so the validation job can scrape EPP metrics without a bearer token. That override is CI-only; leave metrics auth enabled for normal deployments unless you explicitly need unauthenticated scraping.
+Nightly CI also sets `--set router.monitoring.prometheus.auth.enabled=false` so the validation job can scrape EPP metrics without a bearer token. That override is CI-only; leave metrics auth enabled for normal deployments unless you explicitly need unauthenticated scraping.
 
 For SLO-aware scheduling, swap the values file: `-f guides/${GUIDE_NAME}/router/predicted-latency-slo.values.yaml`.
 
@@ -92,12 +95,12 @@ To use a Kubernetes Gateway managed proxy rather than the standalone version, fo
 export REPO_ROOT=$(realpath $(git rev-parse --show-toplevel))
 export PROVIDER_NAME=gke # options: none, gke, agentgateway, istio
 helm install ${GUIDE_NAME} \
-    oci://registry.k8s.io/gateway-api-inference-extension/charts/inferencepool \
+    oci://ghcr.io/llm-d/charts/llm-d-router-gateway-dev \
     -f ${REPO_ROOT}/guides/recipes/router/base.values.yaml \
     -f ${REPO_ROOT}/guides/recipes/router/features/httproute-flags.yaml \
     -f ${REPO_ROOT}/guides/${GUIDE_NAME}/router/predicted-latency.values.yaml \
     --set provider.name=${PROVIDER_NAME} \
-    -n ${NAMESPACE} --version ${GAIE_VERSION}
+    -n ${NAMESPACE} --version ${ROUTER_CHART_VERSION}
 ```
 
 </details>
@@ -140,6 +143,7 @@ export IP=$(kubectl get service ${GUIDE_NAME}-epp -n ${NAMESPACE} -o jsonpath='{
 ```bash
 export IP=$(kubectl get gateway llm-d-inference-gateway -n ${NAMESPACE} -o jsonpath='{.status.addresses[0].value}')
 ```
+
 </details>
 
 ### 2. Send a Test Request
@@ -191,7 +195,6 @@ helm uninstall ${GUIDE_NAME} -n ${NAMESPACE}
 kubectl delete  -n ${NAMESPACE} -k guides/optimized-baseline/modelserver/gpu/vllm/${INFRA_PROVIDER}
 kubectl delete namespace ${NAMESPACE}
 ```
-
 
 ## Troubleshooting
 

@@ -52,11 +52,14 @@ This guide includes configurations for the following accelerators:
   ```
 
 - Set the following environment variables:
+
   ```bash
     export GAIE_VERSION=v1.5.0
+    export ROUTER_CHART_VERSION=v0
     export GUIDE_NAME="optimized-baseline"
     export NAMESPACE=llm-d-optimized-baseline
   ```
+
 - Install the Gateway API Inference Extension CRDs:
 
   ```bash
@@ -64,6 +67,7 @@ This guide includes configurations for the following accelerators:
   ```
 
 - Create a target namespace for the installation
+
   ```bash
       kubectl create namespace ${NAMESPACE}
   ```
@@ -79,10 +83,10 @@ This deploys the llm-d Router in [Standalone Mode](placeholder-link):
 ```bash
 # Assuming base-directory is the root of the llm-d repo
 helm install ${GUIDE_NAME} \
-    oci://registry.k8s.io/gateway-api-inference-extension/charts/standalone \
+    oci://ghcr.io/llm-d/charts/llm-d-router-standalone-dev \
     -f guides/recipes/router/base.values.yaml \
     -f guides/${GUIDE_NAME}/router/${GUIDE_NAME}.values.yaml \
-    -n ${NAMESPACE} --version ${GAIE_VERSION}
+    -n ${NAMESPACE} --version ${ROUTER_CHART_VERSION}
 ```
 
 <details>
@@ -96,13 +100,13 @@ To use a Kubernetes Gateway managed proxy rather than the standalone version, fo
 ```bash
 export PROVIDER_NAME=gke # options: none, gke, agentgateway, istio
 helm install ${GUIDE_NAME} \
-    oci://registry.k8s.io/gateway-api-inference-extension/charts/inferencepool  \
+    oci://ghcr.io/llm-d/charts/llm-d-router-gateway-dev  \
     -f guides/recipes/router/base.values.yaml \
     -f guides/${GUIDE_NAME}/router/${GUIDE_NAME}.values.yaml \
     --set provider.name=${PROVIDER_NAME} \
-    --set experimentalHttpRoute.enabled=true \
-    --set experimentalHttpRoute.inferenceGatewayName=llm-d-inference-gateway \
-    -n ${NAMESPACE} --version ${GAIE_VERSION}
+    --set httpRoute.create=true \
+    --set httpRoute.inferenceGatewayName=llm-d-inference-gateway \
+    -n ${NAMESPACE} --version ${ROUTER_CHART_VERSION}
 ```
 
 </details>
