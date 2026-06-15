@@ -195,7 +195,7 @@ If your environment does not allow alpha feature gates, KEDA is a stable alterna
 
 ---
 
-## Experimental: GPU Quota-Aware Coordinator
+## Experimental: GPU Quota-Aware Scaling
 
 > **⚠️ Experimental Feature:** This feature is a proof of concept and is **not production-ready**. Enable it only in test or development environments after understanding the risks. The controller logs a warning at startup when this feature is enabled.
 
@@ -355,6 +355,20 @@ The coordinator and HPA work at different layers:
 | GPU quota cap | Coordinator | Maximum replicas allowed within the namespace |
 
 The HPA still drives scaling decisions based on queue size and request load. The coordinator acts as a guardrail, dynamically adjusting each HPA's `maxReplicas` ceiling so that the sum of all replicas never exceeds the available GPU quota.
+
+### Perceived Effects
+
+| Condition | What you observe |
+|---|---|
+| Demand rises, quota nearly full | Coordinator lowers `spec.maxReplicas` on one or more HPAs — the HPA cannot schedule new pods beyond the new ceiling |
+| Demand drops, replicas scale down | Coordinator raises `spec.maxReplicas` back toward the value defined in the HPA manifest |
+| One model is idle | Its freed GPUs are reflected in the quota calculation, allowing other HPAs to receive a higher ceiling |
+
+Changes to `spec.maxReplicas` are visible in real time:
+
+```bash
+kubectl get hpa -n <your-namespace> -w
+```
 
 ### Sample Multi-Model Setup with Kustomize
 
