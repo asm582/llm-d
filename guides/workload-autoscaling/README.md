@@ -44,6 +44,10 @@ The [Workload Variant Autoscaler (WVA)](./README.wva.md) path integrates the Kub
 
 WVA is designed for operators running multiple variants of the same model across different GPU hardware types (A100s, H100s, L4s), each with different cost and performance characteristics. WVA continuously monitors KV cache utilization, queue depth, and performance budgets to determine optimal replica counts across variants. Rather than scaling all variants equally, WVA preferentially adds capacity on the cheapest available variant and removes it from the most expensive — optimizing infrastructure cost without violating latency SLOs.
 
+## GPU Quota-Aware Scaling (Experimental)
+
+The [GPU Quota-Aware Scaling guide](./README.gpu-coordinator.md) covers the **GPU Coordinator**, an experimental feature for namespaces where multiple model deployments share a fixed GPU quota. Without coordination, individual HPAs scale independently and can collectively exceed the available GPU quota. The coordinator runs a leader-elected control loop that reads a Kubernetes `ResourceQuota` and dynamically caps `spec.maxReplicas` on opted-in HPAs to keep total GPU consumption within the namespace quota. This feature is a proof of concept and is not production-ready — use it only in test or development environments.
+
 ## Choosing a Path
 
 | | [HPA + EPP Metrics](./README.hpa-epp.md) | [HPA + WVA Metrics](./README.wva.md) |
@@ -53,3 +57,5 @@ WVA is designed for operators running multiple variants of the same model across
 | **Cost optimization** | None — scales based on load signals only | Optimizes across variants by preferring lower-cost hardware |
 | **Additional components** | None — standard Kubernetes HPA only | Requires the WVA controller |
 | **Scale to zero** | Supported | Supported |
+
+> **Note:** The [GPU Quota-Aware Scaling](./README.gpu-coordinator.md) feature can be layered on top of either path to prevent GPU over-provisioning when multiple models share a fixed namespace quota.
