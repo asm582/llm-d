@@ -1,4 +1,4 @@
-# Experimental: GPU Quota-Aware Scaling
+# Replica Rebalancing (Experimental)
 
 > **⚠️ Experimental Feature:** This feature is a proof of concept and is **not production-ready**. Enable it only in test or development environments after understanding the risks. The controller logs a warning at startup when this feature is enabled.
 
@@ -26,6 +26,7 @@ The coordinator only manages HPAs that have been explicitly opted in via an anno
 
 ## Prerequisites
 
+- Multiple inference pools deployed in the same namespace via the multi-inference pool setup guide.
 - `llm-d-workload-variant-autoscaler` deployed in your cluster.
 - Prometheus adapter (or KEDA) configured per the [HPA + EPP Metrics guide](./README.hpa-epp.md#configuration-guide) — the coordinator works alongside the existing HPA setup, not instead of it.
 - A `ResourceQuota` defining the GPU quota for the namespace.
