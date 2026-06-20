@@ -26,7 +26,7 @@ The replica rebalancer only manages HPAs that have been explicitly opted in via 
 
 ## Prerequisites
 
-- Multiple inference pools deployed in the same namespace via the multi-inference pool setup guide.
+- Multiple inference pools deployed in the same namespace via the [Multi-Inference Pool Setup guide](./README.multi-inference-pool.md).
 - `llm-d-workload-variant-autoscaler` deployed in your cluster.
 - Prometheus adapter (or KEDA) configured per the [HPA + EPP Metrics guide](./README.hpa-epp.md#configuration-guide) — the replica rebalancer works alongside the existing HPA setup, not instead of it.
 - A `ResourceQuota` defining the GPU quota for the namespace.
